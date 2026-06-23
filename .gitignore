@@ -1,0 +1,23 @@
+# deps
+/node_modules
+
+# next
+/.next
+/out
+next-env.d.ts.bak
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# downloads (CLI output dir)
+/downloads
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.*.local
+*.log
+.vercel

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -13,10 +13,32 @@ export interface InspectResult {
   thumbnail?: string | null;
 }
 
-const YT_DLP =
-  process.env.YT_DLP_PATH ||
-  (process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
-const FFMPEG = process.env.FFMPEG_PATH || "ffmpeg";
+// Prefer env var, then bundled binary downloaded by scripts/download-yt-dlp.mjs,
+// then system PATH (for local dev).
+function resolveYtDlp(): string {
+  if (process.env.YT_DLP_PATH) return process.env.YT_DLP_PATH;
+  const bundled = path.join(
+    process.cwd(),
+    "bin",
+    process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
+  );
+  if (existsSync(bundled)) return bundled;
+  return process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
+}
+
+// Prefer env var, then ffmpeg-static npm bundle, then system PATH.
+function resolveFfmpeg(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const p: unknown = require("ffmpeg-static");
+    if (typeof p === "string" && p && existsSync(p)) return p;
+  } catch { /* fallthrough */ }
+  return "ffmpeg";
+}
+
+const YT_DLP = resolveYtDlp();
+const FFMPEG = resolveFfmpeg();
 
 const YOUTUBE_RE =
   /^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be)\/.+/i;

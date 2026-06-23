@@ -14,6 +14,9 @@ __pycache__/
 # downloads (CLI output dir)
 /downloads
 
+# yt-dlp binary downloaded at build time
+/bin
+
 # misc
 .DS_Store
 .env

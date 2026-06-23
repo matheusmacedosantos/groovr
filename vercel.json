@@ -1,0 +1,8 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "functions": {
+    "app/api/download/route.ts": { "maxDuration": 300 },
+    "app/api/inspect/route.ts": { "maxDuration": 60 }
+  }
+}

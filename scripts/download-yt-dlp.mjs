@@ -15,7 +15,7 @@ if (process.env.YT_DLP_PATH) {
 
 const rootDir = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const binDir = join(rootDir, "bin");
-const { platform, arch } = process;
+const { platform } = process;
 
 const BIN_NAME = platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 const ASSET =
@@ -25,7 +25,7 @@ const ASSET =
       ? "yt-dlp_macos"
       : "yt-dlp_linux"; // Vercel runs on Linux x64
 
-const URL =
+const DOWNLOAD_URL =
   `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${ASSET}`;
 const OUT = join(binDir, BIN_NAME);
 
@@ -71,7 +71,7 @@ function fetch(url, dest) {
 }
 
 try {
-  await fetch(URL, OUT);
+  await fetch(DOWNLOAD_URL, OUT);
   if (platform !== "win32") chmodSync(OUT, 0o755);
   console.log("[prebuild] yt-dlp ready");
 } catch (err) {

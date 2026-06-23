@@ -4,12 +4,12 @@ const nextConfig = {
   output: "standalone",
   experimental: {
     serverComponentsExternalPackages: ["archiver"],
-  },
-  // Ensure yt-dlp and ffmpeg-static binaries are included in the
-  // serverless function bundle when deploying to Vercel.
-  outputFileTracingIncludes: {
-    "/api/download": ["./bin/**", "./node_modules/ffmpeg-static/**"],
-    "/api/inspect": ["./bin/**", "./node_modules/ffmpeg-static/**"],
+    // Ensure yt-dlp and ffmpeg-static binaries are bundled into the
+    // serverless function on Vercel (Next.js 14 requires this under experimental).
+    outputFileTracingIncludes: {
+      "/api/download": ["./bin/**", "./node_modules/ffmpeg-static/**"],
+      "/api/inspect": ["./bin/**", "./node_modules/ffmpeg-static/**"],
+    },
   },
 };
 

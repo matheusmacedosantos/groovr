@@ -13,32 +13,20 @@ export interface InspectResult {
   thumbnail?: string | null;
 }
 
-// Prefer env var, then bundled binary downloaded by scripts/download-yt-dlp.mjs,
-// then system PATH (for local dev).
-function resolveYtDlp(): string {
-  if (process.env.YT_DLP_PATH) return process.env.YT_DLP_PATH;
-  const bundled = path.join(
-    process.cwd(),
-    "bin",
-    process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
-  );
+// Prefer env var → bundled binary in ./bin/ (copied by scripts/download-yt-dlp.mjs
+// during prebuild) → system PATH (local dev without .env.local).
+// Using a simple existsSync lookup avoids any webpack/require() bundling issues
+// that would hardcode the build-machine's absolute path into the Lambda bundle.
+function resolveBin(envKey: string, name: string): string {
+  const fromEnv = process.env[envKey];
+  if (fromEnv) return fromEnv;
+  const bundled = path.join(process.cwd(), "bin", name);
   if (existsSync(bundled)) return bundled;
-  return process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
+  return name;
 }
 
-// Prefer env var, then ffmpeg-static npm bundle, then system PATH.
-function resolveFfmpeg(): string {
-  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const p: unknown = require("ffmpeg-static");
-    if (typeof p === "string" && p && existsSync(p)) return p;
-  } catch { /* fallthrough */ }
-  return "ffmpeg";
-}
-
-const YT_DLP = resolveYtDlp();
-const FFMPEG = resolveFfmpeg();
+const YT_DLP = resolveBin("YT_DLP_PATH", process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp");
+const FFMPEG = resolveBin("FFMPEG_PATH", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
 
 const YOUTUBE_RE =
   /^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be)\/.+/i;

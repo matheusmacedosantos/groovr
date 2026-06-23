@@ -20,7 +20,7 @@ import { consumeJob, createJob } from "@/lib/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 3600;
+export const maxDuration = 300;
 
 function contentDisposition(filename: string): string {
   const ascii = filename.replace(/[^\x20-\x7e]+/g, "_");

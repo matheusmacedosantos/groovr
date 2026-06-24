@@ -56,6 +56,11 @@ function runCollect(
   });
 }
 
+// YouTube increasingly blocks requests from datacenter IPs (including Vercel
+// Lambda) using the default web client. The ios client uses the iOS app API
+// which is not subject to the same web-based bot-detection challenges.
+const YT_DLP_EXTRACTOR_ARGS = ["--extractor-args", "youtube:player_client=ios,mweb"];
+
 export async function inspectUrl(url: string): Promise<InspectResult> {
   const { code, stdout, stderr } = await runCollect(YT_DLP, [
     "--quiet",
@@ -63,6 +68,7 @@ export async function inspectUrl(url: string): Promise<InspectResult> {
     "--flat-playlist",
     "--dump-single-json",
     "--skip-download",
+    ...YT_DLP_EXTRACTOR_ARGS,
     url,
   ]);
 
@@ -124,6 +130,7 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
     // back to searching system PATH (which doesn't exist in Vercel Lambda).
     "--ffmpeg-location",
     FFMPEG,
+    ...YT_DLP_EXTRACTOR_ARGS,
     "--no-playlist-reverse",
     includePlaylist ? "--yes-playlist" : "--no-playlist",
     "-f",
@@ -175,25 +182,39 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    const pipeLogs = (stream: NodeJS.ReadableStream) => {
+    const errorLines: string[] = [];
+
+    const pipeLogs = (stream: NodeJS.ReadableStream, isStderr: boolean) => {
       let buf = "";
       stream.on("data", (chunk: Buffer) => {
         buf += chunk.toString("utf8");
         const lines = buf.split(/\r?\n/);
         buf = lines.pop() ?? "";
         for (const line of lines) {
-          if (line.trim()) onLog?.(line.trim());
+          if (line.trim()) {
+            onLog?.(line.trim());
+            if (isStderr) errorLines.push(line.trim());
+          }
         }
       });
     };
 
-    pipeLogs(child.stdout);
-    pipeLogs(child.stderr);
+    pipeLogs(child.stdout, false);
+    pipeLogs(child.stderr, true);
 
     child.on("error", reject);
     child.on("close", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`yt-dlp exited with code ${code}`));
+      else {
+        // Surface the last meaningful stderr lines so callers can show the real
+        // reason (e.g. "Sign in to confirm you're not a bot") instead of just
+        // "exit code 1".
+        const detail = errorLines
+          .filter((l) => /ERROR|error|WARNING|failed/i.test(l))
+          .slice(-3)
+          .join(" | ") || errorLines.slice(-3).join(" | ") || `exit code ${code}`;
+        reject(new Error(detail));
+      }
     });
   });
 }

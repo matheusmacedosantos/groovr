@@ -120,6 +120,10 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
   const args = [
     "--no-warnings",
     "--newline",
+    // Tell yt-dlp exactly where our bundled ffmpeg lives so it doesn't fall
+    // back to searching system PATH (which doesn't exist in Vercel Lambda).
+    "--ffmpeg-location",
+    FFMPEG,
     "--no-playlist-reverse",
     includePlaylist ? "--yes-playlist" : "--no-playlist",
     "-f",

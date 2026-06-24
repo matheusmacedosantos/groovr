@@ -56,12 +56,32 @@ function runCollect(
   });
 }
 
-// YouTube increasingly blocks requests from datacenter IPs (including Vercel
-// Lambda) using the default web client. The ios client uses the iOS app API
-// which is not subject to the same web-based bot-detection challenges.
-const YT_DLP_EXTRACTOR_ARGS = ["--extractor-args", "youtube:player_client=ios,mweb"];
+// Use tv_embedded + ios as fallback clients.  These bypass the PO-token /
+// "Sign in to confirm you're not a bot" wall that YouTube applies to the
+// default web client on datacenter IPs (Vercel Lambda).
+const YT_DLP_EXTRACTOR_ARGS = [
+  "--extractor-args",
+  "youtube:player_client=tv_embedded,ios,mweb",
+];
+
+// If YOUTUBE_COOKIES_B64 is set (base64-encoded Netscape cookies.txt exported
+// from a logged-in browser), write them to a temp file and return the path so
+// callers can pass --cookies <path> to yt-dlp.  This is the most reliable way
+// to bypass YouTube bot-detection on server / datacenter IPs.
+async function cookieArgs(): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
+  const b64 = process.env.YOUTUBE_COOKIES_B64;
+  if (!b64) return { args: [], cleanup: async () => {} };
+
+  const cookiePath = path.join(tmpdir(), `yta-cookies-${randomUUID()}.txt`);
+  await fs.writeFile(cookiePath, Buffer.from(b64, "base64").toString("utf8"), { mode: 0o600 });
+  return {
+    args: ["--cookies", cookiePath],
+    cleanup: () => fs.unlink(cookiePath).catch(() => {}),
+  };
+}
 
 export async function inspectUrl(url: string): Promise<InspectResult> {
+  const { args: ckArgs, cleanup } = await cookieArgs();
   const { code, stdout, stderr } = await runCollect(YT_DLP, [
     "--quiet",
     "--no-warnings",
@@ -69,8 +89,9 @@ export async function inspectUrl(url: string): Promise<InspectResult> {
     "--dump-single-json",
     "--skip-download",
     ...YT_DLP_EXTRACTOR_ARGS,
+    ...ckArgs,
     url,
-  ]);
+  ]).finally(() => cleanup());
 
   if (code !== 0) {
     throw new Error(
@@ -115,6 +136,7 @@ interface DownloadOptions {
 
 export async function runYtDlp(opts: DownloadOptions): Promise<void> {
   const { url, format, includePlaylist, outDir, onLog } = opts;
+  const { args: ckArgs, cleanup } = await cookieArgs();
 
   // Filename templates — never prefix with playlist index. Playlists are
   // grouped into a folder named after the playlist title, single tracks land
@@ -126,11 +148,10 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
   const args = [
     "--no-warnings",
     "--newline",
-    // Tell yt-dlp exactly where our bundled ffmpeg lives so it doesn't fall
-    // back to searching system PATH (which doesn't exist in Vercel Lambda).
     "--ffmpeg-location",
     FFMPEG,
     ...YT_DLP_EXTRACTOR_ARGS,
+    ...ckArgs,
     "--no-playlist-reverse",
     includePlaylist ? "--yes-playlist" : "--no-playlist",
     "-f",
@@ -206,9 +227,6 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
     child.on("close", (code) => {
       if (code === 0) resolve();
       else {
-        // Surface the last meaningful stderr lines so callers can show the real
-        // reason (e.g. "Sign in to confirm you're not a bot") instead of just
-        // "exit code 1".
         const detail = errorLines
           .filter((l) => /ERROR|error|WARNING|failed/i.test(l))
           .slice(-3)
@@ -216,7 +234,7 @@ export async function runYtDlp(opts: DownloadOptions): Promise<void> {
         reject(new Error(detail));
       }
     });
-  });
+  }).finally(() => cleanup());
 }
 
 const COVER_EXTS = [".jpg", ".jpeg", ".png", ".webp"];

@@ -65,8 +65,7 @@ def inspect(url: str) -> dict:
 
 def build_options(fmt: str, is_playlist: bool) -> dict:
     if is_playlist:
-        template = str(OUTPUT_DIR / "%(playlist_title)s" /
-                       "%(playlist_index)03d - %(title)s.%(ext)s")
+        template = str(OUTPUT_DIR / "%(playlist_title)s" / "%(title)s.%(ext)s")
     else:
         template = str(OUTPUT_DIR / "%(title)s.%(ext)s")
 
@@ -89,12 +88,11 @@ def build_options(fmt: str, is_playlist: bool) -> dict:
     opts = {
         "format": "bestaudio/best",
         "outtmpl": template,
-        "writethumbnail": True,    # needed so we can embed the cover
-        "writeinfojson": False,    # no leftover .info.json
+        "writethumbnail": True,
+        "writeinfojson": False,
         "postprocessors": postprocessors,
         "ignoreerrors": True,
-        "noplaylist": False,
-        "yes_playlist": True,
+        "noplaylist": not is_playlist,
         "quiet": False,
     }
 

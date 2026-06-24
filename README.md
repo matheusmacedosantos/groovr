@@ -1,22 +1,68 @@
-# yt-audio
+# Groovr
 
-Web app that extracts the audio track from any YouTube video or full playlist
-as **MP3 320 kbps** or **lossless WAV (24-bit / 48 kHz)**, with metadata and
-cover art embedded directly into the file. The downloaded file is streamed
-straight to the user's browser — nothing is kept on the server.
-
-Built with **Next.js 14 (App Router) + TypeScript**, backed by **yt-dlp** and
-**ffmpeg**.
+Download audio from YouTube — MP3 320 kbps ou WAV lossless — com metadados e capa embutidos.
 
 ---
 
-## Local development
+## Download via CLI (local)
 
-Prerequisites on `PATH`:
+**Pré-requisitos:** Python 3, ffmpeg instalado (`brew install ffmpeg`)
 
-- Node.js 20+
-- [`ffmpeg`](https://ffmpeg.org/)
-- [`yt-dlp`](https://github.com/yt-dlp/yt-dlp)
+### Primeira vez (setup único)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Uso
+
+```bash
+# Interativo — pede URL e formato
+./groovr
+
+# Vídeo direto em MP3
+./groovr "https://youtu.be/XXXXX" --mp3
+
+# Vídeo direto em WAV
+./groovr "https://youtu.be/XXXXX" --wav
+
+# Playlist inteira em MP3 sem confirmação
+./groovr "https://www.youtube.com/playlist?list=XXXXX" --mp3 --yes
+```
+
+Os arquivos ficam em `downloads/`. Playlists são organizadas em pastas com o nome da playlist.
+
+---
+
+## Download via Web (groovr.xyz)
+
+Acesse **groovr.xyz**, cole o link e clique em Download.
+
+---
+
+## Deploy (Vercel)
+
+O projeto está conectado ao GitHub. Qualquer push na branch `main` faz deploy automático.
+
+Para downloads funcionarem em produção, adicione nas variáveis de ambiente do Vercel:
+
+| Variável | Valor |
+|---|---|
+| `YOUTUBE_COOKIES_B64` | Cookies do YouTube exportados em base64 (ver abaixo) |
+
+**Como exportar os cookies:**
+1. Instale a extensão **"Get cookies.txt LOCALLY"** no Chrome
+2. Entre em youtube.com logado na sua conta
+3. Clique na extensão e exporte `cookies.txt`
+4. No terminal: `base64 -i cookies.txt | tr -d '\n' | pbcopy`
+5. Cole o valor na variável `YOUTUBE_COOKIES_B64` no Vercel
+6. Faça um novo deploy
+
+---
+
+## Dev local (web app)
 
 ```bash
 npm install
@@ -24,54 +70,13 @@ npm run dev
 # → http://localhost:3000
 ```
 
-Optional overrides (for non-standard install paths):
+## Docker
 
 ```bash
-YT_DLP_PATH=/usr/local/bin/yt-dlp FFMPEG_PATH=/opt/homebrew/bin/ffmpeg npm run dev
+docker build -t groovr .
+docker run --rm -p 3000:3000 groovr
 ```
 
-## Production build
+---
 
-```bash
-npm run build
-npm run start
-```
-
-## Deploy with Docker
-
-The included `Dockerfile` builds a minimal Debian image with `ffmpeg`,
-`python3` and the latest `yt-dlp` baked in. Works on any container host
-(Fly.io, Railway, Render, Cloud Run, your own VPS, etc.).
-
-```bash
-docker build -t yt-audio .
-docker run --rm -p 3000:3000 yt-audio
-```
-
-> Vercel's default serverless runtime does **not** include `ffmpeg` /
-> `yt-dlp`, so deploy to a Node-server platform (Railway, Fly, Render,
-> Docker, etc.) instead.
-
-## API
-
-- `POST /api/inspect` — `{ url }` → `{ isPlaylist, title, count }`
-- `POST /api/download` — `{ url, format: "mp3" | "wav", playlist: boolean }`
-  → streams the produced audio file (or a `.zip` for playlists) with
-  `Content-Disposition: attachment`.
-
-## CLI (legacy)
-
-The original Python CLI (`download.py`) is still available for terminal use:
-
-```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python3 download.py "https://www.youtube.com/watch?v=…" --mp3
-```
-
-## Notes
-
-YouTube only serves compressed audio (Opus/AAC ~128–256 kbps). WAV does not
-create quality out of nowhere — it guarantees zero additional loss from what
-YouTube provides. Use WAV for editing or transcription work, MP3 for casual
-listening.
+> YouTube só serve áudio comprimido (Opus ~128–256 kbps). WAV não cria qualidade do nada — garante zero perda adicional. Use WAV para edição, MP3 para escuta.
